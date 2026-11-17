@@ -6,11 +6,14 @@
 library(tidyverse)
 library(epidatr)
 
-file_storage <- "C:/Users/juliegil/Documents/Delphi_Work/oracle/real_time_storage/"
+file_storage <- "C:/Users/juliegil/Documents/Delphi_Work/oracle/hold/"
 
 ### api key
-code_loc1 <- "C:/Users/juliegil/Documents/UofM_Work/MICOM/pipeline_work/"
-DELPHI_EPIDATA_KEY <- read.table(paste0(code_loc1, "delphi_key.txt"))[1, 1]
+code_loc1 <- "C:/Users/juliegil/Documents/Delphi_Work/"
+#DELPHI_EPIDATA_KEY <- read.table(paste0(code_loc1, "delphi_key.txt"))[1, 1]
+
+key <- read.table(paste0(code_loc1, "delphi_key.txt"))[1, 1]
+Sys.setenv(DELPHI_EPIDATA_KEY = key)
 
 ### goal - request as much/many delphi signals as possible
 ### select most recent data point(s) available
@@ -25,8 +28,8 @@ all_query_records <- data.frame()
 
 # nssp ---- 
 
-nssp_signals <- epidata_meta(source = "nssp")$nssp$signals
-nssp_geos <- epidata_meta(source = "nssp")$nssp$geo_types
+nssp_signals <- epidata_meta(source = "nssp")$signals
+nssp_geos <- epidata_meta(source = "nssp")$geo_types
 
 # $nssp$signals
 # [1] "pct_ed_visits_ari"                "pct_ed_visits_combined"          
@@ -90,8 +93,8 @@ nssp_lag_calc <- nssp_lag_calc %>%
 
 source_choice <- "nhsn"
 
-nhsn_signals <- epidata_meta(source = source_choice)$nhsn$signals
-nhsn_geos <- epidata_meta(source = source_choice)$nhsn$geo_types
+nhsn_signals <- epidata_meta(source = source_choice)$signals
+nhsn_geos <- epidata_meta(source = source_choice)$geo_types
 
 all_nhsn <- data.frame()
 
@@ -151,8 +154,8 @@ nhsn_lag_calc <- nhsn_lag_calc %>%
 
 source_choice <- "pophive"
 
-pophive_signals <- epidata_meta(source = source_choice)$pophive$signals
-pophive_geos <- epidata_meta(source = source_choice)$pophive$geo_types
+pophive_signals <- epidata_meta(source = source_choice)$signals
+pophive_geos <- epidata_meta(source = source_choice)$geo_types
 
 all_pophive <- data.frame()
 
@@ -214,8 +217,8 @@ pophive_lag_calc <- pophive_lag_calc %>%
 
 source_choice <- "nwss"
 
-nwss_signals <- epidata_meta(source = source_choice)$nwss$signals
-nwss_geos <- epidata_meta(source = source_choice)$nwss$geo_types
+nwss_signals <- epidata_meta(source = source_choice)$signals
+nwss_geos <- epidata_meta(source = source_choice)$geo_types
 
 all_nwss <- data.frame()
 
@@ -277,8 +280,8 @@ nwss_lag_calc <- nwss_lag_calc %>%
 
 source_choice <- "claims_outpatient"
 
-cdo_signals <- epidata_meta(source = source_choice)$claims_outpatient$signals
-cdo_geos <- epidata_meta(source = source_choice)$claims_outpatient$geo_types
+cdo_signals <- epidata_meta(source = source_choice)$signals
+cdo_geos <- epidata_meta(source = source_choice)$geo_types
 
 all_cdo <- data.frame()
 
@@ -341,8 +344,8 @@ cdo_lag_calc <- cdo_lag_calc %>%
 
 source_choice <- "claims_inpatient"
 
-cdi_signals <- epidata_meta(source = source_choice)$claims_inpatient$signals
-cdi_geos <- epidata_meta(source = source_choice)$claims_inpatient$geo_types
+cdi_signals <- epidata_meta(source = source_choice)$signals
+cdi_geos <- epidata_meta(source = source_choice)$geo_types
 
 all_cdi <- data.frame()
 
@@ -402,10 +405,10 @@ cdi_lag_calc <- cdi_lag_calc %>%
 
 # va_respiratory ---- 
 
-source_choice <- "va_respiratory"
+source_choice <- "vha_respiratory_vaccinations"
 
-vares_signals <- epidata_meta(source = source_choice)$va_respiratory$signals
-vares_geos <- epidata_meta(source = source_choice)$va_respiratory$geo_types
+vares_signals <- epidata_meta(source = source_choice)$signals
+vares_geos <- epidata_meta(source = source_choice)$geo_types
 
 all_vares <- data.frame()
 
@@ -463,85 +466,222 @@ vares_lag_calc <- vares_lag_calc %>%
 
 
 
+# va_respiratory 2 ---- 
+
+source_choice <- "vha_respiratory_cases"
+
+vares_signals <- epidata_meta(source = source_choice)$signals
+vares_geos <- epidata_meta(source = source_choice)$geo_types
+
+all_vares2 <- data.frame()
+
+for (every_signal in vares_signals){
+  
+  for (each_geo_type in vares_geos){
+    
+    query_start_time <- Sys.time()
+    
+    vares1 <- epidata_snapshot(
+      source = source_choice, 
+      signals =  every_signal, 
+      geo_type = each_geo_type, 
+      geo_values = "*",
+      reference_time = epirange(from = "20260701", to = "20290101")#, 
+      #fill_method = "source"
+    )
+    
+    query_end_time <- Sys.time()
+    query_time <- query_end_time - query_start_time
+    
+    query_add <- data.frame(source = source_choice, 
+                            signals = every_signal, 
+                            geo_type = each_geo_type, 
+                            reference_time_start = "20260701",
+                            reference_time_end = "20290101", 
+                            queried_on = Sys.Date(), 
+                            query_start = query_start_time, 
+                            query_end = query_end_time, 
+                            total_query_time = query_time, 
+                            rows_returned = nrow(vares1), 
+                            cols_returned = ncol(vares1))
+    
+    all_query_records <- rbind(all_query_records, query_add)
+    
+    
+    all_vares2 <- rbind(all_vares2, vares1)
+    
+  }
+}
+
+write.csv(all_vares2, paste0(file_storage, source_choice, "_", gsub("-", "", Sys.Date()), ".csv"), row.names = FALSE, na = '')
+
+# then calculate lag
+
+vares_lag_calc2 <- filter(all_vares2, !is.na(value)) %>% 
+  group_by(signal, geo_type, fill_method) %>%
+  summarize(max_date = max(reference_time))
+
+vares_lag_calc2 <- vares_lag_calc2 %>% mutate(today = Sys.Date(), 
+                                            source = source_choice)
+
+vares_lag_calc2 <- vares_lag_calc2 %>% 
+  mutate(lag_time = as.numeric(difftime(today, max_date, units = "days")))
+
+
+
 # sleepcycle ---- 
 
-# source_choice <- "sleepcycle"
-# 
-# sc_signals <- epidata_meta(source = source_choice)$sleepcycle$signals
-# sc_geos <- epidata_meta(source = source_choice)$sleepcycle$geo_types
-# 
-# all_sc <- data.frame()
-# 
-# for (every_signal in sc_signals){
-#   
-#   for (each_geo_type in sc_geos){
-#     
-#     query_start_time <- Sys.time()
-#     
-#     sc1 <- epidata_snapshot(
-#       source = source_choice, 
-#       signals =  every_signal, 
-#       geo_type = each_geo_type, 
-#       geo_values = "*",
-#       reference_time = epirange(from = "20260701", to = "20290101"), 
-#       fill_method = "source"
-#     )
-#     
-#     query_end_time <- Sys.time()
-#     query_time <- query_end_time - query_start_time
-#     
-#     query_add <- data.frame(source = source_choice, 
-#                             signals = every_signal, 
-#                             geo_type = each_geo_type, 
-#                             reference_time_start = "20260701",
-#                             reference_time_end = "20290101", 
-#                             queried_on = Sys.Date(), 
-#                             query_start = query_start_time, 
-#                             query_end = query_end_time, 
-#                             total_query_time = query_time, 
-#                             rows_returned = nrow(sc1), 
-#                             cols_returned = ncol(sc1))
-#     
-#     all_query_records <- rbind(all_query_records, query_add)
-#     
-#     
-#     all_sc <- rbind(all_sc, sc1)
-#     
-#   }
-# }
-# 
-# write.csv(all_sc, paste0(file_storage, source_choice, "_", gsub("-", "", Sys.Date()), ".csv"), row.names = FALSE, na = '')
-# 
-# # then calculate lag
-# 
-# sc_lag_calc <- filter(all_sc, !is.na(value)) %>% 
-#   group_by(signal, geo_type, fill_method) %>%
-#   summarize(max_date = max(reference_time))
-# 
-# sc_lag_calc <- sc_lag_calc %>% mutate(today = Sys.Date(), 
-#                                             source = source_choice)
-# 
-# sc_lag_calc <- sc_lag_calc %>% 
-#   mutate(lag_time = as.numeric(difftime(today, max_date, units = "days")))
+source_choice <- "sleepcycle"
+
+sc_signals <- epidata_meta(source = source_choice)$signals
+sc_geos <- epidata_meta(source = source_choice)$geo_types
+
+all_sc <- data.frame()
+
+for (every_signal in sc_signals){
+
+  for (each_geo_type in sc_geos){
+
+    query_start_time <- Sys.time()
+
+    sc1 <- epidata_snapshot(
+      source = source_choice,
+      signals =  every_signal,
+      geo_type = each_geo_type,
+      geo_values = "*",
+      reference_time = epirange(from = "20260701", to = "20290101"),
+      fill_method = "source"
+    )
+
+    query_end_time <- Sys.time()
+    query_time <- query_end_time - query_start_time
+
+    query_add <- data.frame(source = source_choice,
+                            signals = every_signal,
+                            geo_type = each_geo_type,
+                            reference_time_start = "20260701",
+                            reference_time_end = "20290101",
+                            queried_on = Sys.Date(),
+                            query_start = query_start_time,
+                            query_end = query_end_time,
+                            total_query_time = query_time,
+                            rows_returned = nrow(sc1),
+                            cols_returned = ncol(sc1))
+
+    all_query_records <- rbind(all_query_records, query_add)
+
+
+    all_sc <- rbind(all_sc, sc1)
+
+  }
+}
+
+write.csv(all_sc, paste0(file_storage, source_choice, "_", gsub("-", "", Sys.Date()), ".csv"), row.names = FALSE, na = '')
+
+# then calculate lag
+
+sc_lag_calc <- filter(all_sc, !is.na(value)) %>%
+  group_by(signal, geo_type, fill_method) %>%
+  summarize(max_date = max(reference_time))
+
+sc_lag_calc <- sc_lag_calc %>% mutate(today = Sys.Date(),
+                                            source = source_choice)
+
+sc_lag_calc <- sc_lag_calc %>%
+  mutate(lag_time = as.numeric(difftime(today, max_date, units = "days")))
 
 
 
+# nchs + ---- 
+
+source_set <- c('nchs_mortality', 'rvdss', 'fluview_ilinet',
+                'fluview_resp_lab_clinical', 'fluview_resp_lab_ph', 'flusurv', 'nrevss')
+all_lag_calc <- data.frame()
+
+for (i in source_set){
+
+    source_choice <- i
+    
+    a_signals <- epidata_meta(source = source_choice)$signals
+    a_geos <- epidata_meta(source = source_choice)$geo_types
+    
+    all_a <- data.frame()
+    
+    for (every_signal in a_signals){
+      
+      for (each_geo_type in a_geos){
+        
+        query_start_time <- Sys.time()
+        
+        a1 <- epidata_snapshot(
+          source = source_choice,
+          signals =  every_signal,
+          geo_type = each_geo_type,
+          geo_values = "*",
+          reference_time = epirange(from = "20260701", to = "20290101"),
+          fill_method = "source"
+        )
+        
+        query_end_time <- Sys.time()
+        query_time <- query_end_time - query_start_time
+        
+        a1$source <- source_choice
+        
+        query_add <- data.frame(source = source_choice,
+                                signals = every_signal,
+                                geo_type = each_geo_type,
+                                reference_time_start = "20260701",
+                                reference_time_end = "20290101",
+                                queried_on = Sys.Date(),
+                                query_start = query_start_time,
+                                query_end = query_end_time,
+                                total_query_time = query_time,
+                                rows_returned = nrow(sc1),
+                                cols_returned = ncol(sc1))
+        
+        query_add$source <- source_choice
+        
+        all_query_records <- rbind(all_query_records, query_add)
+        
+        
+        all_a <- rbind(all_a, a1)
+        
+        
+      }
+    }
+    
+    write.csv(all_a, paste0(file_storage, "all_a_", gsub("-", "", Sys.Date()), ".csv"), row.names = FALSE, na = '')
+    
+    # then calculate lag
+    
+    a_lag_calc <- filter(all_a, !is.na(value)) %>%
+      group_by(source, signal, geo_type, fill_method) %>%
+      summarize(max_date = max(reference_time))
+    
+    a_lag_calc <- a_lag_calc %>% mutate(today = Sys.Date())
+    
+    a_lag_calc <- a_lag_calc %>%
+      mutate(lag_time = as.numeric(difftime(today, max_date, units = "days")))
+    
+    all_lag_calc <- rbind(all_lag_calc, a_lag_calc)
+
+}
 
 # all together, look at lag ---- 
 
 all_lags <- rbind(nssp_lag_calc, nhsn_lag_calc, pophive_lag_calc, 
                   nwss_lag_calc, cdo_lag_calc, cdi_lag_calc, 
-                  vares_lag_calc)#, sc_lag_calc)
+                  vares_lag_calc, vares_lag_calc2, sc_lag_calc, all_lag_calc)
 
-write.csv(all_lags, paste0("C:/Users/juliegil/Documents/Delphi_Work/oracle/real_time_first_pass_lags/fp_lags_", gsub("-", "", Sys.Date()), ".csv"), row.names = FALSE, na = '')
+write.csv(all_lags, paste0("C:/Users/juliegil/Documents/Delphi_Work/oracle/fp_lags_", gsub("-", "", Sys.Date()), ".csv"), row.names = FALSE, na = '')
 
-write.csv(all_query_records, paste0("C:/Users/juliegil/Documents/Delphi_Work/oracle/real_time_first_pass_lags/query_times_", gsub("-", "", Sys.Date()), ".csv"), row.names = FALSE, na = '')
+write.csv(all_query_records, paste0("C:/Users/juliegil/Documents/Delphi_Work/oracle/query_times_", gsub("-", "", Sys.Date()), ".csv"), row.names = FALSE, na = '')
 
 ggplot(all_lags, aes(x = lag_time, y = reorder(signal, -lag_time), fill = source)) + 
   geom_col(color = 'black') + 
   theme_bw() + 
   scale_fill_manual(values = c("#588b8b", "#ffffff", "#ffd5c2", 
-                               "#f28f3b", "#c8553d", "#2d3047", "#93b7be")) + 
+                               "#f28f3b", "#c8553d", "#2d3047", "#93b7be", "#588b8b", "#ffffff")) + 
   geom_vline(xintercept = c(7, 14, 21)) + 
   labs(x = "Lag in Days", 
        y = "", 
